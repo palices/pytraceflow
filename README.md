@@ -154,6 +154,16 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - `--no-tracemalloc`: deja psutil pero omite tracemalloc.
 - `--skip-inputs`: no serializa inputs/locals de las llamadas.
 - `--skip-outputs`: no serializa valores de retorno.
+
+### Overhead presets
+- Minimal overhead: `--flush-interval 0 --skip-inputs --skip-outputs`
+- Capture timings + outputs only: `--skip-inputs --flush-interval 5`
+- Capture timings + inputs only: `--skip-outputs --flush-interval 5`
+
+### Perfiles de overhead
+- Overhead mínimo: `--flush-interval 0 --skip-inputs --skip-outputs`
+- Tiempos + outputs (sin inputs): `--skip-inputs --flush-interval 5`
+- Tiempos + inputs (sin outputs): `--skip-outputs --flush-interval 5`
 - Export OTLP (opcional, requiere `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service miapp`, headers extra con `--export-otlp-header clave=valor` (repetible).
 - Cualquier otro argumento se reenvía al script perfilado.
 
