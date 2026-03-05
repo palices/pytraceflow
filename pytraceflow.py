@@ -22,6 +22,7 @@ class PyFlowTraceProfiler:
         flush_call_threshold=0,
         capture_memory=False,
         capture_inputs=True,
+        capture_outputs=True,
         enable_tracemalloc=False,
     ):
         self.script_path = Path(script_path).resolve()
@@ -64,6 +65,7 @@ class PyFlowTraceProfiler:
         self._run_started = None
         self._capture_memory = capture_memory
         self._capture_inputs_enabled = capture_inputs
+        self._capture_outputs_enabled = capture_outputs
         self._enable_tracemalloc = enable_tracemalloc
 
     def _memory_snapshot(self):
@@ -106,6 +108,9 @@ class PyFlowTraceProfiler:
             return repr(value)
 
     def _capture_inputs(self, frame):
+        # Fast path: when inputs capture is disabled, avoid inspect/serialization entirely
+        if not self._capture_inputs_enabled:
+            return {}
         try:
             args = inspect.getargvalues(frame)
         except Exception:
@@ -118,8 +123,6 @@ class PyFlowTraceProfiler:
             values[args.keywords] = frame.f_locals.get(args.keywords)
         values.pop("self", None)
         values.pop("cls", None)
-        if not self._capture_inputs_enabled:
-            return {}
         return {key: self._serialize(val) for key, val in values.items()}
 
     def _get_class_name(self, frame):
@@ -256,7 +259,10 @@ class PyFlowTraceProfiler:
         if event == "return":
             entry["inputs_after"] = self._capture_inputs(frame)
             if entry.get("error") is None:
-                entry["output"] = self._serialize(arg)
+                if self._capture_outputs_enabled:
+                    entry["output"] = self._serialize(arg)
+                else:
+                    entry["output"] = None
                 entry["error"] = None
             entry["duration_ms"] = round((time.time() - started) * 1000, 3)
             entry["memory_after"] = self._memory_snapshot()
@@ -514,6 +520,11 @@ def _build_parser():
         action="store_true",
         help="Do not record call inputs/outputs (reduces serialization)",
     )
+    parser.add_argument(
+        "--skip-outputs",
+        action="store_true",
+        help="Do not record call outputs/return values (reduces serialization)",
+    )
     return parser
 
 
@@ -545,6 +556,7 @@ def main():
         log_flushes=args.log_flushes,
         capture_memory=capture_memory,
         capture_inputs=not args.skip_inputs,
+        capture_outputs=not args.skip_outputs,
         enable_tracemalloc=enable_tracemalloc,
     )
     profiler.run()

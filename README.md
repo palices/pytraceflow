@@ -45,7 +45,7 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - Search with highlighting and floating panels; option to hide Python internals.
 - Dark mode by default, quick controls, and multi-language.
 - Performance knobs: `--flush-interval` (seconds, <=0 disables background flush), `--flush-every-call` (legacy, slower), `--log-flushes` (stderr).
-- Overhead controls: memoria desactivada por defecto; habilita con `--with-memory` (usa psutil + tracemalloc), o combina `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs.
+- Overhead controls: memoria desactivada por defecto; habilita con `--with-memory` (usa psutil + tracemalloc), o combina `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs; `--skip-outputs` evita serializar valores de retorno.
 - Root entry now records total runtime; STDERR line: `[PyTraceFlow] Profiling finished in X.XXXs (script=...)`.
 - Export existing traces to OTLP/Jaeger via `export_otlp.py`, with span names enriched by module and instance id to make nested calls distinct in Jaeger UI.
 
@@ -65,14 +65,15 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - `--with-memory`: enable memory snapshots (psutil + tracemalloc). Default is off; expect slower runs when enabled.
 - `--no-memory`: disable memory snapshots.
 - `--no-tracemalloc`: keep psutil but skip tracemalloc.
-- `--skip-inputs`: do not serialize call inputs/outputs.
+- `--skip-inputs`: do not serialize call inputs/locals.
+- `--skip-outputs`: do not serialize return values.
 - OTLP export (optional, requires `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service myapp`, repeat `--export-otlp-header key=value` for extra headers.
 - Any other args are forwarded to the profiled script.
 
 ### Usage examples
 - Default fast run: `python pytraceflow.py -s samples/basic/basic_sample.py -o pft.json`
 - With memory metrics: `python pytraceflow.py -s samples/basic/basic_sample.py --with-memory --flush-interval 2.0`
-- Minimal overhead: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-interval 0 --skip-inputs`
+- Minimal overhead: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-interval 0 --skip-inputs --skip-outputs`
 - Legacy per-call flush with logs: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-every-call --log-flushes`
 - Memory via psutil only: `python pytraceflow.py -s samples/basic/basic_sample.py --with-memory --no-tracemalloc`
 - Export to OTLP/HTTP: `python pytraceflow.py -s samples/basic/basic_sample.py --export-otlp-endpoint http://localhost:4318/v1/traces --export-otlp-service pytraceflow-sample`
@@ -131,7 +132,7 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - Buscador con resaltado y paneles flotantes; opcion para ocultar internals de Python.
 - Modo oscuro por defecto, controles rapidos y multilenguaje.
 - Ajustes de performance: `--flush-interval` (segundos, <=0 desactiva flush en background), `--flush-every-call` (modo anterior, mas lento), `--log-flushes` (stderr).
-- Controles de overhead: memoria viene desactivada por defecto; `--with-memory` la habilita (psutil + tracemalloc), combinable con `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs.
+- Controles de overhead: memoria viene desactivada por defecto; `--with-memory` la habilita (psutil + tracemalloc), combinable con `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs; `--skip-outputs` evita serializar valores de retorno.
 - La llamada raiz registra el tiempo total; se imprime en STDERR `[PyTraceFlow] Profiling finished in X.XXXs (script=...)`.
 - Export de trazas existentes a OTLP/Jaeger con `export_otlp.py`; los spans incluyen módulo e id de instancia para distinguir llamadas anidadas en Jaeger.
 
@@ -151,14 +152,15 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - `--with-memory`: habilita snapshots de memoria (psutil + tracemalloc). Por defecto está apagado; al activarlo las ejecuciones serán más lentas.
 - `--no-memory`: desactiva snapshots de memoria.
 - `--no-tracemalloc`: deja psutil pero omite tracemalloc.
-- `--skip-inputs`: no serializa inputs/outputs de las llamadas.
+- `--skip-inputs`: no serializa inputs/locals de las llamadas.
+- `--skip-outputs`: no serializa valores de retorno.
 - Export OTLP (opcional, requiere `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service miapp`, headers extra con `--export-otlp-header clave=valor` (repetible).
 - Cualquier otro argumento se reenvía al script perfilado.
 
 ### Ejemplos de uso
 - Ejecución rápida por defecto: `python pytraceflow.py -s samples/basic/basic_sample.py -o pft.json`
 - Con métricas de memoria: `python pytraceflow.py -s samples/basic/basic_sample.py --with-memory --flush-interval 2.0`
-- Overhead mínimo: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-interval 0 --skip-inputs`
+- Overhead mínimo: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-interval 0 --skip-inputs --skip-outputs`
 - Flush por llamada con logs: `python pytraceflow.py -s samples/basic/basic_sample.py --flush-every-call --log-flushes`
 - Solo psutil (sin tracemalloc): `python pytraceflow.py -s samples/basic/basic_sample.py --with-memory --no-tracemalloc`
 - Export a OTLP/HTTP: `python pytraceflow.py -s samples/basic/basic_sample.py --export-otlp-endpoint http://localhost:4318/v1/traces --export-otlp-service pytraceflow-sample`
