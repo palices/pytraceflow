@@ -70,6 +70,8 @@ class PyFlowTraceProfiler:
         self._enable_tracemalloc = enable_tracemalloc
         self._verbose = verbose
         self._heartbeat_thread = None
+        self._flush_count = 0
+        self._last_snapshot_bytes = 0
 
     def _memory_snapshot(self):
         if not self._capture_memory:
@@ -442,6 +444,7 @@ class PyFlowTraceProfiler:
             snapshot = json.dumps(
                 self.records, ensure_ascii=True, separators=(",", ":")
             )
+            snapshot_bytes = len(snapshot.encode("utf-8"))
             current_call = (
                 current
                 or (f"{self._stack[-1].get('module','')}::{self._stack[-1].get('callable','')}" if self._stack else None)
@@ -451,9 +454,12 @@ class PyFlowTraceProfiler:
             self._last_flush = now
             self._dirty = False
             self._pending_new_records = 0
+            self._flush_count += 1
+            self._last_snapshot_bytes = snapshot_bytes
         if log:
             sys.stderr.write(
-                f"[FlowTrace] Writing snapshot (callable={current_call}) to {self.output_path}\n"
+                f"[FlowTrace] Writing snapshot (callable={current_call}) to {self.output_path} "
+                f"(flush#{self._flush_count} size={self._last_snapshot_bytes}B records={len(self.records)})\n"
             )
             sys.stderr.flush()
         self._write_output(snapshot)
@@ -475,6 +481,8 @@ class PyFlowTraceProfiler:
                     f"[FlowTrace] heartbeat calls={len(self.records)} "
                     f"inflight={len(self._inflight)} "
                     f"pending_flush={self._pending_new_records} "
+                    f"flushes={self._flush_count} "
+                    f"last_snapshot_bytes={self._last_snapshot_bytes} "
                     f"since_last_flush={time.time() - self._last_flush:.1f}s"
                 )
                 sys.stderr.write(msg + "\n")

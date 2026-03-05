@@ -47,6 +47,13 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - Performance knobs: `--flush-interval` (seconds, <=0 disables background flush), `--flush-every-call` (legacy, slower), `--log-flushes` (stderr).
 - Overhead controls: memoria desactivada por defecto; habilita con `--with-memory` (usa psutil + tracemalloc), o combina `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs; `--skip-outputs` evita serializar valores de retorno.
 - Verbose/heartbeat: `--verbose` habilita logs de flush y heartbeats periódicos a stderr.
+  - Heartbeat fields:  
+    - `calls`: número total de nodos en la traza acumulada.  
+    - `inflight`: llamadas activas sin `return/exception` (frames abiertos).  
+    - `pending_flush`: llamadas añadidas desde el último flush; se reinicia al escribir snapshot.  
+    - `flushes`: número de snapshots escritos.  
+    - `last_snapshot_bytes`: tamaño en bytes del último JSON escrito.  
+    - `since_last_flush`: segundos desde el último flush.
 - Root entry now records total runtime; STDERR line: `[PyTraceFlow] Profiling finished in X.XXXs (script=...)`.
 - Export existing traces to OTLP/Jaeger via `export_otlp.py`, with span names enriched by module and instance id to make nested calls distinct in Jaeger UI.
 
@@ -69,6 +76,13 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - `--skip-inputs`: do not serialize call inputs/locals.
 - `--skip-outputs`: do not serialize return values.
 - `--verbose`: log flushes and emit heartbeats to stderr.
+  - Heartbeat fields:  
+    - `calls`: total nodes collected.  
+    - `inflight`: frames still active (no return/exception yet).  
+    - `pending_flush`: new calls since last flush; resets on flush.  
+    - `flushes`: snapshots written.  
+    - `last_snapshot_bytes`: size of last JSON snapshot.  
+    - `since_last_flush`: seconds since last flush.
 - OTLP export (optional, requires `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service myapp`, repeat `--export-otlp-header key=value` for extra headers.
 - Any other args are forwarded to the profiled script.
 
@@ -157,6 +171,13 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - `--skip-inputs`: no serializa inputs/locals de las llamadas.
 - `--skip-outputs`: no serializa valores de retorno.
 - `--verbose`: registra flushes y emite heartbeats periódicos a stderr.
+  - Campos del heartbeat:  
+    - `calls`: nodos acumulados.  
+    - `inflight`: llamadas activas sin retorno/excepción.  
+    - `pending_flush`: llamadas nuevas desde el último flush; se reinicia al flushear.  
+    - `flushes`: snapshots escritos.  
+    - `last_snapshot_bytes`: tamaño en bytes del último JSON.  
+    - `since_last_flush`: segundos desde el último flush.
 
 ### Overhead presets
 - Minimal overhead: `--flush-interval 0 --skip-inputs --skip-outputs`
