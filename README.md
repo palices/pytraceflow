@@ -207,6 +207,8 @@ set PYTRACEFLOW_VERBOSE=1
 - The main process is also traced unless `PYTRACEFLOW_SKIP_MAIN=1`.
 - Tracing of `pytraceflow.py` itself is skipped to avoid recursion.
 - Works best with the spawn start method (default on Windows/macOS). On Linux fork, the profile may already be active in the child; env flags still apply.
+- Output location: each process writes `pft_<pid>.json` to `PYTRACEFLOW_OUT_DIR` (default `bench-output/autotrace` under the repo). Set `PYTRACEFLOW_OUT_DIR=.` to write to the current working directory.
+- Quick setup on Windows (cmd): `scripts\enable_autotrace.bat` exports all vars with sensible defaults.
 
 ## Autotrace multiproceso (experimental)
 
@@ -225,6 +227,8 @@ set PYTRACEFLOW_VERBOSE=1
 - El proceso principal también se traza salvo que definas `PYTRACEFLOW_SKIP_MAIN=1`.
 - Se omite trazar `pytraceflow.py` para evitar recursión.
 - Funciona mejor con el modo spawn (Windows/macOS). En Linux con fork, el profiler puede venir ya activo; las flags se aplican igualmente.
+- Ubicación de salida: cada proceso escribe `pft_<pid>.json` en `PYTRACEFLOW_OUT_DIR` (por defecto `bench-output/autotrace` en el repo). Pon `PYTRACEFLOW_OUT_DIR=.` para que escriba en el directorio actual.
+- Configuración rápida en Windows (cmd): `scripts\enable_autotrace.bat` deja las variables listas con valores por defecto.
 - Export OTLP (opcional, requiere `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service miapp`, headers extra con `--export-otlp-header clave=valor` (repetible).
 - Cualquier otro argumento se reenvía al script perfilado.
 
