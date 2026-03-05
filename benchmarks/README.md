@@ -117,3 +117,15 @@ python -m pstats bench-output/traced.prof
 ## Notas
 - `--flush-interval 5` es un valor razonable para reducir E/S. Para desactivar flush periódico, usa `--flush-interval 0` (en `feature/optimize` solo se flushea al final o por umbral).
 - `--skip-inputs` evita serializar locals y baja mucho el overhead cuando hay objetos grandes.
+
+## Multiprocessing demo
+
+Run workers without tracing children:
+```bash
+python benchmarks/mp_trace_demo.py --jobs 4 --iterations 200000
+```
+
+Trace each worker separately (one JSON per child):
+```bash
+python benchmarks/mp_trace_demo.py --jobs 4 --iterations 200000 --trace-children --output-dir bench-output/mp
+```

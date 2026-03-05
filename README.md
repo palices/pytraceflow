@@ -54,6 +54,7 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
     - `flushes`: número de snapshots escritos.  
     - `last_snapshot_bytes`: tamaño en bytes del último JSON escrito.  
     - `since_last_flush`: segundos desde el último flush.
+- Multiprocessing autotrace (experimental): habilita tracing automático en procesos hijos vía `sitecustomize.py` usando variables de entorno. Cada proceso escribe su propio JSON `pft_<pid>.json`.
 - Root entry now records total runtime; STDERR line: `[PyTraceFlow] Profiling finished in X.XXXs (script=...)`.
 - Export existing traces to OTLP/Jaeger via `export_otlp.py`, with span names enriched by module and instance id to make nested calls distinct in Jaeger UI.
 
@@ -188,6 +189,42 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - Overhead mínimo: `--flush-interval 0 --skip-inputs --skip-outputs`
 - Tiempos + outputs (sin inputs): `--skip-inputs --flush-interval 5`
 - Tiempos + inputs (sin outputs): `--skip-outputs --flush-interval 5`
+
+## Multiprocessing autotrace (experimental)
+
+Enable via environment variables so child processes started with `multiprocessing` are traced automatically (one JSON per PID):
+```
+set PYTHONPATH=C:\path\to\repo;%PYTHONPATH%
+set PYTRACEFLOW_AUTOTRACE=1
+set PYTRACEFLOW_OUT_DIR=bench-output\autotrace
+set PYTRACEFLOW_FLUSH_INTERVAL=5
+set PYTRACEFLOW_FLUSH_CALL_THRESHOLD=500
+set PYTRACEFLOW_SKIP_INPUTS=1
+set PYTRACEFLOW_SKIP_OUTPUTS=1
+set PYTRACEFLOW_VERBOSE=1
+```
+- Each process writes `pft_<pid>.json` under `PYTRACEFLOW_OUT_DIR`.
+- The main process is also traced unless `PYTRACEFLOW_SKIP_MAIN=1`.
+- Tracing of `pytraceflow.py` itself is skipped to avoid recursion.
+- Works best with the spawn start method (default on Windows/macOS). On Linux fork, the profile may already be active in the child; env flags still apply.
+
+## Autotrace multiproceso (experimental)
+
+Habilita trazado automático en procesos hijos de `multiprocessing` usando variables de entorno (un JSON por PID):
+```
+set PYTHONPATH=C:\ruta\al\repo;%PYTHONPATH%
+set PYTRACEFLOW_AUTOTRACE=1
+set PYTRACEFLOW_OUT_DIR=bench-output\autotrace
+set PYTRACEFLOW_FLUSH_INTERVAL=5
+set PYTRACEFLOW_FLUSH_CALL_THRESHOLD=500
+set PYTRACEFLOW_SKIP_INPUTS=1
+set PYTRACEFLOW_SKIP_OUTPUTS=1
+set PYTRACEFLOW_VERBOSE=1
+```
+- Cada proceso escribe `pft_<pid>.json` en `PYTRACEFLOW_OUT_DIR`.
+- El proceso principal también se traza salvo que definas `PYTRACEFLOW_SKIP_MAIN=1`.
+- Se omite trazar `pytraceflow.py` para evitar recursión.
+- Funciona mejor con el modo spawn (Windows/macOS). En Linux con fork, el profiler puede venir ya activo; las flags se aplican igualmente.
 - Export OTLP (opcional, requiere `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service miapp`, headers extra con `--export-otlp-header clave=valor` (repetible).
 - Cualquier otro argumento se reenvía al script perfilado.
 

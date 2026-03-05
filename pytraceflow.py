@@ -72,6 +72,8 @@ class PyFlowTraceProfiler:
         self._heartbeat_thread = None
         self._flush_count = 0
         self._last_snapshot_bytes = 0
+        self._live_mode_started = False
+        self._live_mode_stopped = False
 
     def _memory_snapshot(self):
         if not self._capture_memory:
@@ -295,50 +297,11 @@ class PyFlowTraceProfiler:
 
     def run(self):
         script_name = self.script_path.name
-        self._root_entry = {
-            "id": 0,
-            "callable": script_name,
-            "module": "__main__",
-            "called": script_name,
-            "inputs": {},
-            "output": None,
-            "error": None,
-            "duration_ms": None,
-            "calls": [],
-        }
-        self.records = [self._root_entry]
-        self._stack = [self._root_entry]
-        self._dirty = True
-        if self._enable_tracemalloc and self._capture_memory:
-            tracemalloc.start(10)
-            self._tracemalloc_enabled = True
-        else:
-            self._tracemalloc_enabled = False
-        if self._verbose:
-            sys.stderr.write("[FlowTrace] verbose mode enabled\n")
-            sys.stderr.flush()
-        self._run_started = time.perf_counter()
-        self._root_entry["memory_before"] = self._memory_snapshot()
-        self._maybe_flush(
-            force=True,
-            current=self._root_entry.get("callable"),
-            log=self._log_flushes,
-        )  # snapshot inicial
-        sys.setprofile(self._profile)
+        self._begin_profile(script_name)
         old_argv = sys.argv
         # emula la ejecucion normal del script, permitiendo argumentos personalizados
         sys.argv = [str(self.script_path)] + self.script_args
         exc_raised: BaseException | None = None
-        # lanzar thread que flushea cada _flush_interval
-        self._stop_flush.clear()
-        if self._flush_interval > 0:
-            self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
-            self._flush_thread.start()
-        if self._verbose:
-            self._heartbeat_thread = threading.Thread(
-                target=self._heartbeat_loop, daemon=True
-            )
-            self._heartbeat_thread.start()
         try:
             runpy.run_path(str(self.script_path), run_name="__main__")
         except BaseException as exc:  # capturamos para reflejar error en la raiz
@@ -355,32 +318,8 @@ class PyFlowTraceProfiler:
             self._propagate_error(self._root_entry, repr(exc))
         finally:
             sys.argv = old_argv
-            sys.setprofile(None)
-            total_ms = (
-                round((time.perf_counter() - self._run_started) * 1000, 3)
-                if self._run_started is not None
-                else None
-            )
-            self._root_entry["duration_ms"] = total_ms
-            self._root_entry["memory_after"] = self._memory_snapshot()
-            if self._tracemalloc_enabled:
-                tracemalloc.stop()
-            self._prune_calls(self._root_entry)
-            self._dirty = True
-            self._maybe_flush(force=True, log=self._log_flushes)
-            self._stop_flush.set()
-            if self._flush_thread:
-                self._flush_thread.join(timeout=1)
-            if self._heartbeat_thread:
-                self._heartbeat_thread.join(timeout=1)
-            if total_ms is not None:
-                sys.stderr.write(
-                    f"[FlowTrace] Profiling finished in {total_ms/1000:.3f}s (script={self.script_path.name})\n"
-                )
-                sys.stderr.flush()
+            self._end_profile(self.script_path.name, exc_raised)
             print()
-        if exc_raised:
-            raise exc_raised
 
     def _prune_calls(self, node):
         pruned = []
@@ -410,6 +349,25 @@ class PyFlowTraceProfiler:
             node["error"] = exc_repr
         for child in node.get("calls", []):
             self._propagate_error(child, exc_repr)
+
+    def start_live(self):
+        """Start profiling the current process (for multiprocessing autotrace)."""
+        if self._live_mode_started:
+            return
+        script_name = Path(sys.argv[0]).name or "__process__"
+        self._live_mode_started = True
+        self._begin_profile(script_name)
+
+    def stop_live(self):
+        """Stop profiling the current process (safe to call multiple times)."""
+        if not self._live_mode_started or self._live_mode_stopped:
+            return
+        self._live_mode_stopped = True
+        try:
+            self._end_profile(Path(sys.argv[0]).name or "__process__", None)
+        except Exception:
+            # Avoid raising during atexit
+            pass
 
     def _write_output(self, payload):
         with open(self.output_path, "w", encoding="utf-8", newline="") as f:
@@ -490,6 +448,76 @@ class PyFlowTraceProfiler:
             except Exception:
                 pass
             self._stop_flush.wait(interval)
+
+    def _begin_profile(self, script_name: str):
+        self._root_entry = {
+            "id": 0,
+            "callable": script_name,
+            "module": "__main__",
+            "called": script_name,
+            "inputs": {},
+            "output": None,
+            "error": None,
+            "duration_ms": None,
+            "calls": [],
+        }
+        self.records = [self._root_entry]
+        self._stack = [self._root_entry]
+        self._dirty = True
+        if self._enable_tracemalloc and self._capture_memory:
+            tracemalloc.start(10)
+            self._tracemalloc_enabled = True
+        else:
+            self._tracemalloc_enabled = False
+        if self._verbose:
+            sys.stderr.write("[FlowTrace] verbose mode enabled\n")
+            sys.stderr.flush()
+        self._run_started = time.perf_counter()
+        self._root_entry["memory_before"] = self._memory_snapshot()
+        self._maybe_flush(
+            force=True,
+            current=self._root_entry.get("callable"),
+            log=self._log_flushes,
+        )  # snapshot inicial
+        sys.setprofile(self._profile)
+        self._stop_flush.clear()
+        if self._flush_interval > 0:
+            self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
+            self._flush_thread.start()
+        if self._verbose:
+            self._heartbeat_thread = threading.Thread(
+                target=self._heartbeat_loop, daemon=True
+            )
+            self._heartbeat_thread.start()
+
+    def _end_profile(self, script_name: str, exc_raised: BaseException | None):
+        sys.setprofile(None)
+        total_ms = (
+            round((time.perf_counter() - self._run_started) * 1000, 3)
+            if self._run_started is not None
+            else None
+        )
+        if self._root_entry is not None:
+            self._root_entry["duration_ms"] = total_ms
+            self._root_entry["memory_after"] = self._memory_snapshot()
+        if self._tracemalloc_enabled:
+            tracemalloc.stop()
+        if self._root_entry is not None:
+            self._prune_calls(self._root_entry)
+        self._dirty = True
+        self._maybe_flush(force=True, log=self._log_flushes)
+        self._stop_flush.set()
+        if self._flush_thread:
+            self._flush_thread.join(timeout=1)
+        if self._heartbeat_thread:
+            self._heartbeat_thread.join(timeout=1)
+        if total_ms is not None:
+            sys.stderr.write(
+                f"[FlowTrace] Profiling finished in {total_ms/1000:.3f}s (script={script_name})\n"
+            )
+            sys.stderr.flush()
+        if exc_raised:
+            raise exc_raised
 
     def _is_class_definition_node(self, node):
         return (
