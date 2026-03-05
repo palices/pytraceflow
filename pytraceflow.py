@@ -24,6 +24,7 @@ class PyFlowTraceProfiler:
         capture_inputs=True,
         capture_outputs=True,
         enable_tracemalloc=False,
+        verbose=False,
     ):
         self.script_path = Path(script_path).resolve()
         self.output_path = Path(output_path)
@@ -67,6 +68,8 @@ class PyFlowTraceProfiler:
         self._capture_inputs_enabled = capture_inputs
         self._capture_outputs_enabled = capture_outputs
         self._enable_tracemalloc = enable_tracemalloc
+        self._verbose = verbose
+        self._heartbeat_thread = None
 
     def _memory_snapshot(self):
         if not self._capture_memory:
@@ -309,6 +312,9 @@ class PyFlowTraceProfiler:
             self._tracemalloc_enabled = True
         else:
             self._tracemalloc_enabled = False
+        if self._verbose:
+            sys.stderr.write("[FlowTrace] verbose mode enabled\n")
+            sys.stderr.flush()
         self._run_started = time.perf_counter()
         self._root_entry["memory_before"] = self._memory_snapshot()
         self._maybe_flush(
@@ -326,6 +332,11 @@ class PyFlowTraceProfiler:
         if self._flush_interval > 0:
             self._flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
             self._flush_thread.start()
+        if self._verbose:
+            self._heartbeat_thread = threading.Thread(
+                target=self._heartbeat_loop, daemon=True
+            )
+            self._heartbeat_thread.start()
         try:
             runpy.run_path(str(self.script_path), run_name="__main__")
         except BaseException as exc:  # capturamos para reflejar error en la raiz
@@ -358,6 +369,8 @@ class PyFlowTraceProfiler:
             self._stop_flush.set()
             if self._flush_thread:
                 self._flush_thread.join(timeout=1)
+            if self._heartbeat_thread:
+                self._heartbeat_thread.join(timeout=1)
             if total_ms is not None:
                 sys.stderr.write(
                     f"[FlowTrace] Profiling finished in {total_ms/1000:.3f}s (script={self.script_path.name})\n"
@@ -453,6 +466,23 @@ class PyFlowTraceProfiler:
                 pass
             self._stop_flush.wait(self._flush_interval)
 
+    def _heartbeat_loop(self):
+        interval = self._flush_interval if self._flush_interval > 0 else 5.0
+        interval = max(interval, 5.0)
+        while not self._stop_flush.is_set():
+            try:
+                msg = (
+                    f"[FlowTrace] heartbeat calls={len(self.records)} "
+                    f"inflight={len(self._inflight)} "
+                    f"pending_flush={self._pending_new_records} "
+                    f"since_last_flush={time.time() - self._last_flush:.1f}s"
+                )
+                sys.stderr.write(msg + "\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+            self._stop_flush.wait(interval)
+
     def _is_class_definition_node(self, node):
         return (
             node.get("module") == "__main__"
@@ -525,6 +555,11 @@ def _build_parser():
         action="store_true",
         help="Do not record call outputs/return values (reduces serialization)",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Verbose logging: flush logs to stderr and periodic heartbeats",
+    )
     return parser
 
 
@@ -546,6 +581,8 @@ def main():
     _, args = _parse_args()
     capture_memory = args.with_memory and not args.no_memory
     enable_tracemalloc = capture_memory and not args.no_tracemalloc
+    if args.verbose:
+        args.log_flushes = True
     profiler = PyFlowTraceProfiler(
         args.script,
         args.output,
@@ -558,6 +595,7 @@ def main():
         capture_inputs=not args.skip_inputs,
         capture_outputs=not args.skip_outputs,
         enable_tracemalloc=enable_tracemalloc,
+        verbose=args.verbose,
     )
     profiler.run()
 

@@ -46,6 +46,7 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - Dark mode by default, quick controls, and multi-language.
 - Performance knobs: `--flush-interval` (seconds, <=0 disables background flush), `--flush-every-call` (legacy, slower), `--log-flushes` (stderr).
 - Overhead controls: memoria desactivada por defecto; habilita con `--with-memory` (usa psutil + tracemalloc), o combina `--no-tracemalloc` / `--no-memory`. `--skip-inputs` evita serializar args/kwargs; `--skip-outputs` evita serializar valores de retorno.
+- Verbose/heartbeat: `--verbose` habilita logs de flush y heartbeats periódicos a stderr.
 - Root entry now records total runtime; STDERR line: `[PyTraceFlow] Profiling finished in X.XXXs (script=...)`.
 - Export existing traces to OTLP/Jaeger via `export_otlp.py`, with span names enriched by module and instance id to make nested calls distinct in Jaeger UI.
 
@@ -67,6 +68,7 @@ PyTraceFlow is a trace visualizer designed as a "post-mortem debugger": instead 
 - `--no-tracemalloc`: keep psutil but skip tracemalloc.
 - `--skip-inputs`: do not serialize call inputs/locals.
 - `--skip-outputs`: do not serialize return values.
+- `--verbose`: log flushes and emit heartbeats to stderr.
 - OTLP export (optional, requires `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service myapp`, repeat `--export-otlp-header key=value` for extra headers.
 - Any other args are forwarded to the profiled script.
 
@@ -154,6 +156,7 @@ PyTraceFlow es un visualizador de trazas de ejecucion, pensado como un "debugger
 - `--no-tracemalloc`: deja psutil pero omite tracemalloc.
 - `--skip-inputs`: no serializa inputs/locals de las llamadas.
 - `--skip-outputs`: no serializa valores de retorno.
+- `--verbose`: registra flushes y emite heartbeats periódicos a stderr.
 
 ### Overhead presets
 - Minimal overhead: `--flush-interval 0 --skip-inputs --skip-outputs`
