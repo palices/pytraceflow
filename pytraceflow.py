@@ -16,9 +16,10 @@ class PyFlowTraceProfiler:
         script_path,
         output_path,
         script_args=None,
-        flush_interval=1.0,
+        flush_interval=5.0,
         flush_every_call=False,
         log_flushes=False,
+        flush_call_threshold=0,
         capture_memory=False,
         capture_inputs=True,
         enable_tracemalloc=False,
@@ -55,6 +56,8 @@ class PyFlowTraceProfiler:
         self._flush_thread = None
         self._last_seen_callable = None
         self._flush_interval = float(flush_interval)
+        self._flush_call_threshold = int(flush_call_threshold)
+        self._pending_new_records = 0
         self._flush_every_call = flush_every_call
         self._log_flushes = log_flushes
         self._dirty = False
@@ -210,6 +213,7 @@ class PyFlowTraceProfiler:
                     )
                     root_calls.append(instance_entry)
                     self._instance_roots[instance_id] = instance_entry
+                    self._pending_new_records += 1
 
             entry = {
                 "id": self._next_id,
@@ -239,6 +243,7 @@ class PyFlowTraceProfiler:
             self._stack.append(entry)
             entry["memory_before"] = self._memory_snapshot()
             self._dirty = True
+            self._pending_new_records += 1
             self._maybe_flush(
                 force=self._flush_every_call, current=entry["callable"], log=False
             )
@@ -394,11 +399,27 @@ class PyFlowTraceProfiler:
         if log is None:
             log = self._log_flushes
         now = time.time()
-        if not force and (not self._dirty or now - self._last_flush < self._flush_interval):
-            return
-        with self._write_lock:
-            if not force and (not self._dirty or now - self._last_flush < self._flush_interval):
+        time_ready = self._flush_interval > 0 and now - self._last_flush >= self._flush_interval
+        threshold_ready = (
+            self._flush_call_threshold > 0
+            and self._pending_new_records >= self._flush_call_threshold
+        )
+        if not force:
+            if not self._dirty:
                 return
+            if not (time_ready or threshold_ready):
+                return
+        with self._write_lock:
+            if not force:
+                time_ready = (
+                    self._flush_interval > 0 and now - self._last_flush >= self._flush_interval
+                )
+                threshold_ready = (
+                    self._flush_call_threshold > 0
+                    and self._pending_new_records >= self._flush_call_threshold
+                )
+                if not self._dirty or not (time_ready or threshold_ready):
+                    return
             snapshot = json.dumps(
                 self.records, ensure_ascii=True, separators=(",", ":")
             )
@@ -410,6 +431,7 @@ class PyFlowTraceProfiler:
             )
             self._last_flush = now
             self._dirty = False
+            self._pending_new_records = 0
         if log:
             sys.stderr.write(
                 f"[FlowTrace] Writing snapshot (callable={current_call}) to {self.output_path}\n"
@@ -453,8 +475,14 @@ def _build_parser():
     parser.add_argument(
         "--flush-interval",
         type=float,
-        default=1.0,
+        default=5.0,
         help="Seconds between background flushes; <=0 disables periodic flush",
+    )
+    parser.add_argument(
+        "--flush-call-threshold",
+        type=int,
+        default=500,
+        help="Flush after N new calls regardless of time; 0 disables this threshold",
     )
     parser.add_argument(
         "--flush-every-call",
@@ -512,6 +540,7 @@ def main():
         args.output,
         args.script_args,
         flush_interval=args.flush_interval,
+        flush_call_threshold=args.flush_call_threshold,
         flush_every_call=args.flush_every_call,
         log_flushes=args.log_flushes,
         capture_memory=capture_memory,
