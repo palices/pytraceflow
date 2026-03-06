@@ -120,6 +120,7 @@ set PYTRACEFLOW_VERBOSE=1
   `PYTRACEFLOW_FLUSH_INTERVAL`, `PYTRACEFLOW_FLUSH_CALL_THRESHOLD`, `PYTRACEFLOW_SKIP_INPUTS`, `PYTRACEFLOW_SKIP_OUTPUTS`,  
   `PYTRACEFLOW_VERBOSE`, `PYTRACEFLOW_WITH_MEMORY`, `PYTRACEFLOW_NO_MEMORY`, `PYTRACEFLOW_NO_TRACEMALLOC`, `PYTRACEFLOW_SKIP_MAIN`, `PYTRACEFLOW_OUT_DIR`.
 - Autotrace remains **disabled** unless `PYTRACEFLOW_AUTOTRACE=1` is set; without it, `sitecustomize.py` is no-op and normal `pytraceflow.py` usage is unchanged.
+- Verbose logs now include `pid`, `roots`, and `nodes` (total calls) per process to disambiguate multi-process runs.
 
 ## Included examples
 - `script.py` basic example.
@@ -238,6 +239,7 @@ set PYTRACEFLOW_VERBOSE=1
   `PYTRACEFLOW_FLUSH_INTERVAL`, `PYTRACEFLOW_FLUSH_CALL_THRESHOLD`, `PYTRACEFLOW_SKIP_INPUTS`, `PYTRACEFLOW_SKIP_OUTPUTS`,  
   `PYTRACEFLOW_VERBOSE`, `PYTRACEFLOW_WITH_MEMORY`, `PYTRACEFLOW_NO_MEMORY`, `PYTRACEFLOW_NO_TRACEMALLOC`, `PYTRACEFLOW_SKIP_MAIN`, `PYTRACEFLOW_OUT_DIR`.
 - El autotrace está **desactivado** si no defines `PYTRACEFLOW_AUTOTRACE=1`; sin ella, `sitecustomize.py` no hace nada y el uso normal de `pytraceflow.py` no cambia.
+- Los logs en modo verbose incluyen `pid`, `roots` y `nodes` (llamadas totales) por proceso para distinguir ejecuciones multiproceso.
 - Export OTLP (opcional, requiere `opentelemetry-*`): `--export-otlp-endpoint http://localhost:4318/v1/traces`, `--export-otlp-service miapp`, headers extra con `--export-otlp-header clave=valor` (repetible).
 - Cualquier otro argumento se reenvía al script perfilado.
 
